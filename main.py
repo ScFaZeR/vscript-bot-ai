@@ -23,7 +23,7 @@ def keep_alive():
     t.start()
 
 # --- INTELLIGENCE ARTIFICIELLE ---
-def ask_gemini(prompt, model="gemini-2.0-flash"):
+def ask_gemini(prompt, model="gemini-1.5-flash"):
     # On tente le modèle 2.0 Flash (Standard 2026)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}"
     headers = {'Content-Type': 'application/json'}
