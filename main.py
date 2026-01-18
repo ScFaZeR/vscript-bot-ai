@@ -8,12 +8,12 @@ from threading import Thread
 DISCORD_TOKEN = os.environ.get('DISCORD_TOKEN')
 GEMINI_KEY = os.environ.get('GEMINI_KEY')
 
-# --- SERVEUR WEB (Pour Render) ---
+# --- SERVEUR WEB ---
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot en ligne et prêt !"
+    return "Bot en ligne (Version 2026) !"
 
 def run():
     app.run(host='0.0.0.0', port=8080)
@@ -22,30 +22,35 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
-# --- INTELLIGENCE ARTIFICIELLE (Mode Direct) ---
-def ask_gemini(prompt):
-    # On tape directement sur l'URL de Google, sans passer par la librairie buguée
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+# --- INTELLIGENCE ARTIFICIELLE ---
+def ask_gemini(prompt, model="gemini-2.0-flash"):
+    # On tente le modèle 2.0 Flash (Standard 2026)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}"
     headers = {'Content-Type': 'application/json'}
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
     
     try:
         response = requests.post(url, headers=headers, json=payload)
-        
         if response.status_code == 200:
-            data = response.json()
-            # On récupère le texte dans la réponse complexe de Google
-            return data['candidates'][0]['content']['parts'][0]['text']
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            # Si Google refuse, on affiche pourquoi (Erreur précise)
-            return f"❌ Erreur Google ({response.status_code}): {response.text}"
-            
+            return f"❌ Erreur {response.status_code}: {response.text}"
     except Exception as e:
-        return f"❌ Erreur de connexion : {e}"
+        return f"❌ Erreur Connexion : {e}"
+
+# --- LISTE DES MODÈLES DISPONIBLES (Diagnostic) ---
+def list_models():
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_KEY}"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            models = [m['name'] for m in response.json().get('models', [])]
+            # On filtre pour garder que les modèles "generateContent"
+            chat_models = [m for m in models if 'gemini' in m]
+            return "\n".join(chat_models)
+        return f"Erreur récupération : {response.text}"
+    except Exception as e:
+        return str(e)
 
 # --- BOT DISCORD ---
 intents = discord.Intents.default()
@@ -61,21 +66,26 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    # Si le bot est mentionné
-    if client.user in message.mentions:
-        # Nettoyage du message
-        prompt = message.content.replace(f'<@{client.user.id}>', '').strip()
-        
-        if prompt:
-            async with message.channel.typing():
-                reponse_ia = ask_gemini(prompt)
-                # Discord limite les messages à 2000 caractères, on coupe si c'est trop long
-                if len(reponse_ia) > 1900:
-                    reponse_ia = reponse_ia[:1900] + "... (message coupé)"
-                await message.channel.send(reponse_ia)
-        else:
-            await message.channel.send("Oui ? Pose-moi une question !")
+    # Commande de diagnostic (Si ça plante encore, tape !debug)
+    if message.content == "!debug":
+        await message.channel.send("🔍 Recherche des modèles disponibles en 2026...")
+        liste = list_models()
+        await message.channel.send(f"✅ Modèles trouvés :\n```{liste}```")
+        return
 
-# Lancement
+    # Discussion normale
+    if client.user in message.mentions:
+        prompt = message.content.replace(f'<@{client.user.id}>', '').strip()
+        async with message.channel.typing():
+            # On essaie le modèle 2.0
+            reponse = ask_gemini(prompt, "gemini-2.0-flash")
+            
+            # Si le 2.0 échoue (404), on essaie le 1.5 Pro au cas où
+            if "404" in reponse:
+                 reponse = ask_gemini(prompt, "gemini-1.5-pro")
+            
+            if len(reponse) > 1900: reponse = reponse[:1900] + "..."
+            await message.channel.send(reponse)
+
 keep_alive()
 client.run(DISCORD_TOKEN)
