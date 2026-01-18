@@ -10,7 +10,7 @@ GEMINI_KEY = os.environ.get('GEMINI_KEY')
 
 # 2. Configuration de l'IA (On utilise le modèle Flash, plus rapide et gratuit)
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 # 3. Configuration Discord
 intents = discord.Intents.default()
