@@ -13,7 +13,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot en ligne (Version 2026) !"
+    return "Bot en ligne (Version Stable) !"
 
 def run():
     app.run(host='0.0.0.0', port=8080)
@@ -24,7 +24,7 @@ def keep_alive():
 
 # --- INTELLIGENCE ARTIFICIELLE ---
 def ask_gemini(prompt, model="gemini-1.5-flash"):
-    # On tente le modèle 2.0 Flash (Standard 2026)
+    # On utilise l'URL officielle de Google
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}"
     headers = {'Content-Type': 'application/json'}
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -34,21 +34,19 @@ def ask_gemini(prompt, model="gemini-1.5-flash"):
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            return f"❌ Erreur {response.status_code}: {response.text}"
+            return f"❌ Erreur Google ({response.status_code}): {response.text}"
     except Exception as e:
         return f"❌ Erreur Connexion : {e}"
 
-# --- LISTE DES MODÈLES DISPONIBLES (Diagnostic) ---
+# --- DIAGNOSTIC (!debug) ---
 def list_models():
     url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_KEY}"
     try:
         response = requests.get(url)
         if response.status_code == 200:
             models = [m['name'] for m in response.json().get('models', [])]
-            # On filtre pour garder que les modèles "generateContent"
-            chat_models = [m for m in models if 'gemini' in m]
-            return "\n".join(chat_models)
-        return f"Erreur récupération : {response.text}"
+            return "\n".join([m for m in models if 'gemini' in m])
+        return f"Erreur : {response.text}"
     except Exception as e:
         return str(e)
 
@@ -66,25 +64,25 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    # Commande de diagnostic (Si ça plante encore, tape !debug)
+    # Commande de secours pour voir les modèles
     if message.content == "!debug":
-        await message.channel.send("🔍 Recherche des modèles disponibles en 2026...")
+        await message.channel.send("🔍 Recherche...")
         liste = list_models()
-        await message.channel.send(f"✅ Modèles trouvés :\n```{liste}```")
+        await message.channel.send(f"✅ Modèles disponibles :\n```{liste}```")
         return
 
-    # Discussion normale
+    # Discussion avec le bot
     if client.user in message.mentions:
         prompt = message.content.replace(f'<@{client.user.id}>', '').strip()
+        
         async with message.channel.typing():
-            # On essaie le modèle 2.0
-            reponse = ask_gemini(prompt, "gemini-2.0-flash")
+            # CORRECTION ICI : On appelle directement le modèle 1.5 Flash qui marche
+            reponse = ask_gemini(prompt, "gemini-1.5-flash")
             
-            # Si le 2.0 échoue (404), on essaie le 1.5 Pro au cas où
-            if "404" in reponse:
-                 reponse = ask_gemini(prompt, "gemini-1.5-pro")
+            # Gestion de la limite de caractères Discord (2000 max)
+            if len(reponse) > 1900: 
+                reponse = reponse[:1900] + "... (message coupé)"
             
-            if len(reponse) > 1900: reponse = reponse[:1900] + "..."
             await message.channel.send(reponse)
 
 keep_alive()
