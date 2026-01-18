@@ -13,7 +13,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot en ligne (Version Stable) !"
+    return "Bot en ligne (Mode 2.5 Flash) !"
 
 def run():
     app.run(host='0.0.0.0', port=8080)
@@ -23,8 +23,10 @@ def keep_alive():
     t.start()
 
 # --- INTELLIGENCE ARTIFICIELLE ---
-def ask_gemini(prompt, model="gemini-1.5-flash"):
-    # On utilise l'URL officielle de Google
+def ask_gemini(prompt):
+    # On utilise le modèle validé par ta capture d'écran
+    model = "gemini-2.5-flash"
+    
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}"
     headers = {'Content-Type': 'application/json'}
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -37,18 +39,6 @@ def ask_gemini(prompt, model="gemini-1.5-flash"):
             return f"❌ Erreur Google ({response.status_code}): {response.text}"
     except Exception as e:
         return f"❌ Erreur Connexion : {e}"
-
-# --- DIAGNOSTIC (!debug) ---
-def list_models():
-    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_KEY}"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            models = [m['name'] for m in response.json().get('models', [])]
-            return "\n".join([m for m in models if 'gemini' in m])
-        return f"Erreur : {response.text}"
-    except Exception as e:
-        return str(e)
 
 # --- BOT DISCORD ---
 intents = discord.Intents.default()
@@ -64,24 +54,14 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    # Commande de secours pour voir les modèles
-    if message.content == "!debug":
-        await message.channel.send("🔍 Recherche...")
-        liste = list_models()
-        await message.channel.send(f"✅ Modèles disponibles :\n```{liste}```")
-        return
-
-    # Discussion avec le bot
     if client.user in message.mentions:
         prompt = message.content.replace(f'<@{client.user.id}>', '').strip()
         
         async with message.channel.typing():
-            # CORRECTION ICI : On appelle directement le modèle 1.5 Flash qui marche
-            reponse = ask_gemini(prompt, "gemini-1.5-flash")
+            reponse = ask_gemini(prompt)
             
-            # Gestion de la limite de caractères Discord (2000 max)
             if len(reponse) > 1900: 
-                reponse = reponse[:1900] + "... (message coupé)"
+                reponse = reponse[:1900] + "... (suite coupée)"
             
             await message.channel.send(reponse)
 
